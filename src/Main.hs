@@ -59,8 +59,6 @@ data Config = Config
               , cfgCallSign :: Maybe RepoCallSign
               } deriving Show
 
-type RepoCallSign = Text
-
 normApiUrl :: Text -> Text
 normApiUrl u | T.isSuffixOf "/api/" u = u
              | T.isSuffixOf "/api" u = u <> "/"

@@ -130,6 +130,8 @@ instance FromJSON ConduitCapabilities where
 conduitGetCapabilities :: Conduit -> IO (ConduitResponse ConduitCapabilities)
 conduitGetCapabilities conduit = callConduitPairs conduit "conduit.getcapabilities" []
 
+--------------------------------------------------------------------------------
+
 -- | User information as returned by @user.whoami@
 data User = User
     { u_image        :: !Url
@@ -147,6 +149,34 @@ instance FromJSON User where
 -- | @user.whoami@
 userWhoami :: Conduit -> IO (ConduitResponse User)
 userWhoami conduit = callConduitPairs conduit "user.whoami" []
+
+--------------------------------------------------------------------------------
+
+-- | Repository meta-information as returned by @repository.query@
+data Repo = Repo
+    { repo_callsign    :: !RepoCallSign
+    , repo_description :: Maybe Text
+    , repo_id          :: !Text
+    , repo_isActive    :: !Bool
+    , repo_isImporting :: !Bool
+    , repo_monogram    :: !Text
+    , repo_name        :: !Text
+    , repo_phid        :: !(PHID Repo)
+    , repo_remoteURI   :: !Url
+    -- repo_staging
+    , repo_uri         :: Maybe Url
+    , repo_vcs         :: !Text
+    } deriving (Show,Generic)
+
+instance FromJSON Repo where
+    parseJSON = genericParseJSON J.defaultOptions { J.fieldLabelModifier = drop 5 }
+
+type RepoCallSign = Text
+
+-- | @repository.query"
+repositoryQuery :: Conduit -> [RepoCallSign] -> IO (ConduitResponse [Repo])
+repositoryQuery conduit callsigns
+    = callConduitPairs conduit "repository.query" [ "callsigns" .= callsigns ]
 
 --------------------------------------------------------------------------------
 
@@ -206,7 +236,6 @@ instance FromJSON ConduitSession
 type Url = Text
 
 -- These phantom-types for now, see also 'DRev'
-data Repo
 data Diff
 
 newtype PHID p = PHID Text
