@@ -116,6 +116,19 @@ differentialQuery conduit author = callConduitPairs conduit "differential.query"
 conduitPing :: Conduit -> IO (ConduitResponse Text)
 conduitPing conduit = callConduitPairs conduit "conduit.ping" []
 
+data ConduitCapabilities = ConduitCapabilities
+    { cap_authentication :: [Text]
+    , cap_input          :: [Text]
+    , cap_output         :: [Text]
+    , cap_signatures     :: [Text]
+    } deriving (Show,Generic)
+
+instance FromJSON ConduitCapabilities where
+    parseJSON = genericParseJSON J.defaultOptions { J.fieldLabelModifier = drop 4 }
+
+-- | @conduit.ping@
+conduitGetCapabilities :: Conduit -> IO (ConduitResponse ConduitCapabilities)
+conduitGetCapabilities conduit = callConduitPairs conduit "conduit.getcapabilities" []
 
 -- | User information as returned by @user.whoami@
 data User = User

@@ -11,7 +11,7 @@ import           Control.DeepSeq
 import           Control.Exception      (evaluate)
 import           Control.Lens           hiding (argument, (.=))
 import           Control.Monad.Except
-import           Data.Aeson
+import           Data.Aeson hiding (Error)
 import           Data.Aeson.Lens
 import           Data.Bifunctor
 import           Data.ByteString        (ByteString)
@@ -30,18 +30,23 @@ import           Network.Http.Client    as HC
 import           OpenSSL                (withOpenSSL)
 import           Options.Applicative
 import           System.Directory
+import           System.Exit
 import           System.FilePath
 import           System.IO              (hFlush, stderr, stdout)
 
 import           Network.Conduit.Client
 
-data Verbosity = Info | Verbose
+--------------------------------------------------------------------------------
 
-logVerbose, logError :: Verbosity -> Text -> IO ()
-logVerbose Info _ = pure ()
-logVerbose Verbose t = T.hPutStrLn stderr t
+data Verbosity = Verbose | Info | Error
+               deriving (Eq,Ord)
 
-logError _ = T.hPutStrLn stderr
+logVerbose, logInfo, logError :: Verbosity -> Text -> IO ()
+logVerbose thres t = when (Verbose >= thres) $ T.hPutStrLn stderr t
+logInfo    thres t = when (Info    >= thres) $ T.hPutStrLn stderr t
+logError   thres t = when (Error   >= thres) $ T.hPutStrLn stderr t
+
+--------------------------------------------------------------------------------
 
 data ConfigAuth = ConfigAuthCert !Text !Text -- user/cert
                 | ConfigAuthToken !Text
@@ -196,7 +201,7 @@ runConduit act = act >>= \case
 
 execArcOpts :: ArcOpts -> IO ()
 execArcOpts opts@(ArcOpts {..}) = withOpenSSL $ do
-    -- let verbosity = if verbose then Verbose else Info
+    let verbosity = if verbose then Verbose else Info
     cfg <- readConfig opts
 
     let mkCond (Config {..}) = case (cfgAuth, cfgApiURL) of
@@ -236,9 +241,13 @@ execArcOpts opts@(ArcOpts {..}) = withOpenSSL $ do
             (conduit0, _) <- mkCond cfg' { cfgAuth = ConfigAuthAnon }
 
             -- test API URL anonymously
+            logInfo verbosity "Trying to contact server..."
             _ <- runConduit $ conduitPing conduit0
+            ConduitCapabilities {..} <- runConduit $ conduitGetCapabilities conduit0
 
-            -- TODO: check auth-capabilities
+            unless ("token" `elem` cap_authentication) $ do
+                logError verbosity "Phabricator server doesn't support token-based auth, maybe too old?"
+                exitFailure
 
             let textUrl = T.dropEnd 4 (T.decodeUtf8 apiurl) <> "conduit/login/"
                 apiurl = fromMaybe (error "missing URI") $ cfgApiURL cfg'
