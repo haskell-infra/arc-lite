@@ -98,7 +98,7 @@ data DRev = DRev
     , d_summary        :: !Text
     , d_testPlan       :: !Text
     , d_title          :: !Text
-    , d_uri            :: !Text
+    , d_uri            :: !Url
     } deriving (Show,Generic)
 
 instance FromJSON DRev where
@@ -116,8 +116,23 @@ differentialQuery conduit author = callConduitPairs conduit "differential.query"
 conduitPing :: Conduit -> IO (ConduitResponse Text)
 conduitPing conduit = callConduitPairs conduit "conduit.ping" []
 
+
+-- | User information as returned by @user.whoami@
+data User = User
+    { u_image        :: !Url
+    , u_phid         :: !(PHID User)
+    , u_primaryEmail :: !Text
+    , u_realName     :: !Text
+    , u_roles        :: [Text]
+    , u_uri          :: !Url
+    , u_userName     :: !Text
+    } deriving (Show,Generic)
+
+instance FromJSON User where
+    parseJSON = genericParseJSON J.defaultOptions { J.fieldLabelModifier = drop 2 }
+
 -- | @user.whoami@
-userWhoami :: Conduit -> IO (ConduitResponse Value)
+userWhoami :: Conduit -> IO (ConduitResponse User)
 userWhoami conduit = callConduitPairs conduit "user.whoami" []
 
 --------------------------------------------------------------------------------
@@ -175,8 +190,9 @@ instance FromJSON ConduitSession
 
 --------------------------------------------------------------------------------
 
+type Url = Text
+
 -- These phantom-types for now, see also 'DRev'
-data User
 data Repo
 data Diff
 

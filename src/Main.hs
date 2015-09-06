@@ -13,6 +13,7 @@ import           Control.Lens           hiding (argument, (.=))
 import           Control.Monad.Except
 import           Data.Aeson
 import           Data.Aeson.Lens
+import           Data.Bifunctor
 import           Data.ByteString        (ByteString)
 import qualified Data.ByteString        as BS
 import qualified Data.ByteString.Char8  as BC8
@@ -199,14 +200,15 @@ execArcOpts opts@(ArcOpts {..}) = withOpenSSL $ do
     cfg <- readConfig opts
 
     let mkCond (Config {..}) = case (cfgAuth, cfgApiURL) of
-            (ConfigAuthCert user cert, Just u) -> runConduit $ conduitSessionAuth u user cert
-            (ConfigAuthToken tok, Just u)      -> pure $ (conduitAPITokenAuth u tok, PHID "")
-            (ConfigAuthAnon, Just u)           -> pure $ (conduitAnonAuth u, PHID "")
-            (_, Nothing) -> fail "Could not infer Phabricator API URI"
+            (ConfigAuthCert user cert, Just u) -> second Just <$> runConduit (conduitSessionAuth u user cert)
+            (ConfigAuthToken tok, Just u)      -> pure (conduitAPITokenAuth u tok, Nothing)
+            (ConfigAuthAnon, Just u)           -> pure (conduitAnonAuth u, Nothing)
+            (_, Nothing)                       -> fail "Could not infer Phabricator API URI"
 
     case cmd of
         ArcList -> do
-            (conduit, uid) <- mkCond cfg
+            (conduit, muid) <- mkCond cfg
+            uid <- maybe (u_phid <$> runConduit (userWhoami conduit)) pure muid
             diffs <- runConduit $ differentialQuery conduit uid
 
             forM_ diffs $ \DRev {..} -> do
@@ -254,10 +256,10 @@ execArcOpts opts@(ArcOpts {..}) = withOpenSSL $ do
 
             -- Verify authentication token works
             (conduit1, _) <- mkCond cfg' { cfgAuth = ConfigAuthToken tok }
-            _ <- runConduit $ userWhoami conduit1
+            User {..} <- runConduit $ userWhoami conduit1
 
             T.putStrLn ""
-            T.putStrLn "login successful!"
+            T.putStrLn ("login successful for " <> T.pack (show u_userName))
 
             updateUserConfHostEntry apiurl tok
 
