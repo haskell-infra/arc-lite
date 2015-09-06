@@ -38,8 +38,7 @@ postFormIdentityEncoded u nvs handler
     process up c = do
         body <- outputBuilderToByteString (encodedFormBody nvs)
         sendRequest c (q up (BL.length body)) (lazyByteStringBody body)
-        x <- receiveResponse c handler
-        return x
+        receiveResponse c handler
 
 -- | Convenience function extracting the URL path from an 'URL'.
 -- Returns 'Nothing' when parsing fails.
@@ -56,7 +55,7 @@ urlPath = fmap path . parseURI . T.unpack . T.decodeUtf8
 
 
 lazyByteStringBody :: BL.ByteString -> OutputStream BB.Builder -> IO ()
-lazyByteStringBody b os = write (Just $ BB.lazyByteString b) os
+lazyByteStringBody b = write (Just $ BB.lazyByteString b)
 
 outputBuilderToByteString :: (OutputStream BB.Builder -> IO ()) -> IO BL.ByteString
 outputBuilderToByteString os = BB.toLazyByteString . mconcat <$> outputToList os

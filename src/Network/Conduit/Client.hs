@@ -52,9 +52,9 @@ callConduitPairs (Conduit url auth) meth parms = performCallRaw url meth $ objec
 
 -- | Low-level Conduit RPC
 performCallRaw :: (ToJSON req, FromJSON res) => URL -> ByteString -> req -> IO (ConduitResponse res)
-performCallRaw url meth req = do
+performCallRaw url meth req
     -- we can't use plain 'postForm' because the CDN in front of Phabricator breaks chunked transfers
-    postFormIdentityEncoded url' formData jsonHandler
+    = postFormIdentityEncoded url' formData jsonHandler
   where
     url' = if BC8.last url == '/' then url <> meth else mconcat [ url, "/", meth ]
     formData = [ ("params", L.toStrict (encode req))

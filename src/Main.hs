@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveAnyClass    #-}
-{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -41,7 +40,7 @@ logVerbose, logError :: Verbosity -> Text -> IO ()
 logVerbose Info _ = pure ()
 logVerbose Verbose t = T.hPutStrLn stderr t
 
-logError _ t = T.hPutStrLn stderr t
+logError _ = T.hPutStrLn stderr
 
 data ConfigAuth = ConfigAuthCert !Text !Text -- user/cert
                 | ConfigAuthToken !Text
@@ -123,10 +122,10 @@ readConfig opts@(ArcOpts {..}) = do
     let dfltUrl = muserJson ^? _Just . key "config" . key "default" . _String
         projUrl = mprojJson ^? _Just . _2 . key "phabricator.uri" . _String
 
-    let apiURL = fmap normApiUrl $ msum [conUrl, projUrl, dfltUrl]
+    let apiURL = normApiUrl <$> msum [conUrl, projUrl, dfltUrl]
         cfgApiURL = fmap T.encodeUtf8 apiURL
 
-    logVerbose verbosity ("Phabricator API URL = " <> (maybe "" (T.pack . show) apiURL))
+    logVerbose verbosity ("Phabricator API URL = " <> maybe "" (T.pack . show) apiURL)
 
     let hostEnt | Just u <- apiURL = muserJson ^? _Just . key "hosts" . key u
                 | otherwise = Nothing
@@ -262,9 +261,6 @@ execArcOpts opts@(ArcOpts {..}) = withOpenSSL $ do
 
             updateUserConfHostEntry apiurl tok
 
-            return ()
-
-
 
 updateUserConfHostEntry :: URL -> Text -> IO ()
 updateUserConfHostEntry url0 tok = do
@@ -289,8 +285,8 @@ updateUserConfHostEntry url0 tok = do
                 _        -> fail "FATAL: top-level structure in .arcrc is not a JSON object"
 
             let newcfg = case oldcfg ^? key "hosts" of
-                    Nothing -> oldcfg & (_Object . at "hosts" .~ Just (object [ url .= object [ "token" .= tok ] ]))
-                    Just (Object _) -> oldcfg & ((key "hosts" . _Object . at url) .~ Just (object [ "token" .= tok ]))
+                    Nothing -> oldcfg & _Object . at "hosts" ?~ object [ url .= object [ "token" .= tok ] ]
+                    Just (Object _) -> oldcfg & key "hosts" . _Object . at url ?~ object [ "token" .= tok ]
                     Just _ -> error "FATAL: 'hosts' in .arcrc is not a JSON object"
 
             evaluate (rnf newcfg)
